@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>次女ちゃん翻訳機・試作 v3</title>
+<style>
+body{font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif;margin:0;background:#f5f5f5;color:#222}
+.app{max-width:560px;margin:auto;min-height:100vh;padding:24px 18px;box-sizing:border-box}
+h1{text-align:center;font-size:24px;margin:8px 0 24px}
+.card{background:#fff;border-radius:18px;padding:22px;box-shadow:0 2px 12px #0001}
+#status{text-align:center;min-height:28px;margin-bottom:14px;color:#666}
+.buttons{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+button{border:0;border-radius:16px;padding:18px 10px;font-size:21px;font-weight:700;color:#fff;cursor:pointer}
+#startButton{background:#222} #stopButton{background:#777}
+button:disabled{opacity:.45;cursor:default}
+#result{margin-top:22px;min-height:100px;padding:18px;border-radius:14px;background:#f0f0f0;font-size:25px;line-height:1.6;word-break:break-word}
+.note{margin-top:18px;font-size:14px;color:#666;line-height:1.6}
+</style>
+</head>
+<body>
+<main class="app">
+<h1>次女ちゃん翻訳機・試作 v3</h1>
+<section class="card">
+<div id="status">「話す」を押して話してください</div>
+<div class="buttons">
+<button id="startButton">🎤 話す</button>
+<button id="stopButton" disabled>⏹ 停止</button>
+</div>
+<div id="result">ここに認識結果が表示されます</div>
+<div class="note">※「話す」を押すと、すぐに「停止」が押せる状態になります。<br>※ 音声認識の開始に時間がかかる場合があります。</div>
+</section>
+</main>
+<script>
+const startButton=document.getElementById("startButton");
+const stopButton=document.getElementById("stopButton");
+const status=document.getElementById("status");
+const result=document.getElementById("result");
+const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+let recognition=null, finalText="", listening=false;
+
+if(!SpeechRecognition){
+ status.textContent="このブラウザでは音声認識に対応していません。Chromeなどで試してください。";
+ startButton.disabled=true;
+}else{
+ recognition=new SpeechRecognition();
+ recognition.lang="ja-JP";
+ recognition.continuous=true;
+ recognition.interimResults=true;
+ recognition.maxAlternatives=3;
+
+ recognition.onstart=()=>{
+   status.textContent="🎤 聞いています……話してください";
+ };
+
+ recognition.onresult=(event)=>{
+   let interimText="";
+   for(let i=event.resultIndex;i<event.results.length;i++){
+     const text=event.results[i][0].transcript;
+     if(event.results[i].isFinal) finalText+=text;
+     else interimText+=text;
+   }
+   result.textContent=(finalText+interimText)||"（まだ認識できていません）";
+ };
+
+ recognition.onerror=(event)=>{
+   if(event.error==="aborted") return;
+   if(event.error==="not-allowed") status.textContent="マイクの使用が許可されていません。ブラウザの設定を確認してください。";
+   else if(event.error==="no-speech") status.textContent="声を認識できませんでした。話すボタンでもう一度試してください。";
+   else if(event.error==="audio-capture") status.textContent="マイクを利用できません。マイクの設定を確認してください。";
+   else status.textContent="音声認識エラー："+event.error;
+   listening=false; startButton.disabled=false; stopButton.disabled=true;
+ };
+
+ recognition.onend=()=>{
+   listening=false;
+   startButton.disabled=false;
+   stopButton.disabled=true;
+   if(status.textContent==="🎤 聞いています……話してください") status.textContent="認識が終了しました";
+ };
+
+ startButton.onclick=()=>{
+   if(listening)return;
+   finalText="";
+   result.textContent="聞き取りを準備しています……";
+   // 音声認識の開始を待たず、ここで停止ボタンを有効化
+   listening=true;
+   startButton.disabled=true;
+   stopButton.disabled=false;
+   status.textContent="🎤 起動中……話してください";
+   try{ recognition.start(); }
+   catch(error){
+     listening=false; startButton.disabled=false; stopButton.disabled=true;
+     status.textContent="開始できませんでした。少し待ってからもう一度試してください。";
+   }
+ };
+
+ stopButton.onclick=()=>{
+   if(!recognition)return;
+   status.textContent="⏹ 停止しています……";
+   stopButton.disabled=true;
+   try{ recognition.stop(); }
+   catch(error){
+     listening=false; startButton.disabled=false; stopButton.disabled=true;
+     status.textContent="停止しました";
+   }
+ };
+}
+</script>
+</body>
+</html>
